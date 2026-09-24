@@ -15,7 +15,7 @@ jobs:
 
       - name: Build
         run: |
-          sudo cp index.html /var/www/qr-studio/index.html
+          sudo cp qr-studio.html /var/www/qr-studio/index.html
           echo "HTML updated successfully."
 
       - name: Test
