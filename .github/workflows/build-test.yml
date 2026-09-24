@@ -4,28 +4,21 @@ on:
   push:
     branches:
       - main
-  pull_request:
-    branches:
-      - main
 
 jobs:
   build-and-test:
     runs-on: [self-hosted, ostad-runner-label]
 
     steps:
-      - name: Checkout repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Build
         run: |
-          echo "Starting build..."
-          mkdir -p build
-          cp index.html build/
-          echo "Build completed successfully."
+          sudo cp index.html /var/www/qr-studio/index.html
+          echo "HTML updated successfully."
 
       - name: Test
         run: |
-          echo "Running tests..."
-          test -f build/index.html
-          grep -q "<html" build/index.html
-          echo "All tests passed successfully."
+          curl -f http://localhost:1338
+          echo "Website test passed."
