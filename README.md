@@ -2,8 +2,6 @@
 
 A single-file, self-contained QR code generator with a distinctive "lab specimen tag" visual style: a dark technical interface, viewfinder-style corner brackets, and a teal scan-line animation that sweeps the tag on generation.
 
-Live version: https://claude.ai/artifact/Qae8oEL1fzhTU6kKbH52GQ
-
 ## Features
 
 - **Four content types** — encode a URL, plain text, Wi-Fi credentials, or a phone number, switchable via tabs
