@@ -1,0 +1,783 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Signal Tag — QR Generator</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<style>
+  :root{
+    --void: #0B0F10;
+    --panel: #12181A;
+    --panel-2: #171F21;
+    --border: #232C2E;
+    --border-soft: #1B2325;
+    --paper: #F6F4EC;
+    --ink: #0B0F10;
+    --text: #E7EBEA;
+    --text-dim: #8B9A98;
+    --signal: #4EE8C7;
+    --signal-dim: #2C6F63;
+    --amber: #FFB454;
+    --danger: #FF6B5E;
+    --radius-tag: 6px;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, monospace;
+    --display: "Space Grotesk", system-ui, sans-serif;
+    box-sizing: border-box;
+    padding-top: env(safe-area-inset-top, 0px);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+  *{box-sizing:border-box;}
+  html{scroll-padding-top: env(safe-area-inset-top, 0px);}
+  html,body{height:100%;}
+  body{
+    margin:0;
+    background:
+      radial-gradient(circle at 15% 8%, rgba(78,232,199,0.06), transparent 45%),
+      radial-gradient(circle at 90% 85%, rgba(255,180,84,0.05), transparent 40%),
+      var(--void);
+    color: var(--text);
+    font-family: var(--display);
+    min-height:100%;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* faint scan grid */
+  body::before{
+    content:"";
+    position:fixed; inset:0;
+    background-image:
+      linear-gradient(rgba(255,255,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(255,255,255,0.025) 1px, transparent 1px);
+    background-size: 34px 34px;
+    pointer-events:none;
+    z-index:0;
+  }
+
+  a{color:inherit;}
+  button{font-family:inherit;}
+
+  .shell{
+    position:relative;
+    z-index:1;
+    max-width:1180px;
+    margin:0 auto;
+    padding: 48px 28px 64px;
+  }
+
+  header.top{
+    display:flex;
+    align-items:flex-start;
+    justify-content:space-between;
+    gap:24px;
+    margin-bottom:44px;
+    flex-wrap:wrap;
+  }
+  .mark{
+    display:flex;
+    align-items:center;
+    gap:12px;
+  }
+  .mark-glyph{
+    width:30px;height:30px;
+    border:2.5px solid var(--signal);
+    position:relative;
+    flex:none;
+  }
+  .mark-glyph::after{
+    content:"";
+    position:absolute; inset:7px;
+    background: var(--signal);
+  }
+  .mark-word{
+    font-family: var(--mono);
+    font-size:13px;
+    letter-spacing:0.04em;
+    color: var(--text-dim);
+    line-height:1.3;
+  }
+  .mark-word b{ color: var(--text); font-weight:600; }
+
+  h1{
+    font-size: clamp(30px, 4vw, 44px);
+    line-height:1.08;
+    margin: 0 0 10px;
+    font-weight:600;
+    letter-spacing:-0.01em;
+    max-width: 620px;
+  }
+  .sub{
+    color: var(--text-dim);
+    font-size:15px;
+    max-width:480px;
+    line-height:1.55;
+    margin:0;
+  }
+
+  .grid{
+    display:grid;
+    grid-template-columns: minmax(300px, 420px) 1fr;
+    gap: 28px;
+    align-items:start;
+  }
+  @media (max-width: 860px){
+    .grid{ grid-template-columns: 1fr; }
+  }
+
+  /* ---- control panel ---- */
+  .panel{
+    background: var(--panel);
+    border:1px solid var(--border);
+    padding: 26px;
+  }
+  .field{ margin-bottom:22px; }
+  .field:last-child{ margin-bottom:0; }
+  .field label{
+    display:block;
+    font-family: var(--mono);
+    font-size:11.5px;
+    color: var(--text-dim);
+    margin-bottom:8px;
+    letter-spacing:0.02em;
+  }
+  .field .val{ color: var(--signal); }
+
+  .type-tabs{
+    display:flex;
+    gap:6px;
+    margin-bottom:22px;
+    flex-wrap:wrap;
+  }
+  .type-tabs button{
+    background: transparent;
+    border:1px solid var(--border);
+    color: var(--text-dim);
+    font-family: var(--mono);
+    font-size:11.5px;
+    padding:7px 12px;
+    cursor:pointer;
+    transition: border-color .15s, color .15s, background .15s;
+  }
+  .type-tabs button.active{
+    border-color: var(--signal);
+    color: var(--ink);
+    background: var(--signal);
+  }
+  .type-tabs button:hover:not(.active){
+    border-color:#3a4547;
+    color: var(--text);
+  }
+
+  input[type="text"], input[type="password"], textarea, select{
+    width:100%;
+    background: var(--void);
+    border:1px solid var(--border);
+    color: var(--text);
+    font-family: var(--mono);
+    font-size:13.5px;
+    padding:11px 12px;
+    outline:none;
+    transition: border-color .15s;
+  }
+  textarea{ resize: vertical; min-height:76px; line-height:1.5; }
+  input:focus, textarea:focus, select:focus{ border-color: var(--signal); }
+  input[type="text"]::placeholder, textarea::placeholder{ color:#4c5758; }
+
+  select{ appearance:none; -webkit-appearance:none; cursor:pointer;
+    background-image: linear-gradient(45deg, transparent 50%, var(--text-dim) 50%), linear-gradient(135deg, var(--text-dim) 50%, transparent 50%);
+    background-position: calc(100% - 18px) center, calc(100% - 13px) center;
+    background-size: 5px 5px, 5px 5px;
+    background-repeat:no-repeat;
+  }
+
+  .row2{ display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+  input[type="range"]{
+    -webkit-appearance:none;
+    width:100%; height:2px;
+    background: var(--border);
+    outline:none;
+  }
+  input[type="range"]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:15px; height:15px;
+    background: var(--signal);
+    cursor:pointer;
+    border:2px solid var(--void);
+  }
+  input[type="range"]::-moz-range-thumb{
+    width:11px; height:11px;
+    background: var(--signal);
+    border:2px solid var(--void);
+    cursor:pointer;
+  }
+
+  .swatch-row{ display:flex; gap:12px; }
+  .swatch{
+    flex:1;
+    display:flex;
+    align-items:center;
+    gap:10px;
+    border:1px solid var(--border);
+    padding:8px 10px;
+    background: var(--void);
+  }
+  .swatch input[type="color"]{
+    width:26px; height:26px;
+    border:none;
+    background:none;
+    padding:0;
+    cursor:pointer;
+  }
+  .swatch span{
+    font-family: var(--mono);
+    font-size:11.5px;
+    color: var(--text-dim);
+    text-transform:uppercase;
+  }
+
+  .ec-group{ display:grid; grid-template-columns: repeat(4,1fr); gap:6px; }
+  .ec-group label{
+    margin:0;
+    display:flex; flex-direction:column; align-items:center; gap:3px;
+    border:1px solid var(--border);
+    padding:9px 4px;
+    cursor:pointer;
+    font-family:var(--mono);
+    font-size:10.5px;
+    color: var(--text-dim);
+    text-align:center;
+    transition: border-color .15s, color .15s;
+  }
+  .ec-group input{ display:none; }
+  .ec-group label b{ font-size:13px; color:var(--text); }
+  .ec-group input:checked + label,
+  .ec-group label:has(input:checked){
+    border-color: var(--signal);
+    color: var(--signal);
+  }
+  .ec-group label:has(input:checked) b{ color: var(--signal); }
+
+  .note{
+    font-family: var(--mono);
+    font-size:11px;
+    color:#5c6a68;
+    margin-top:8px;
+    line-height:1.5;
+  }
+
+  /* ---- tag / output side ---- */
+  .stage{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding: 40px 20px;
+    background: var(--panel);
+    border:1px solid var(--border);
+    position:relative;
+    min-height:520px;
+    justify-content:center;
+  }
+
+  .tag{
+    position:relative;
+    background: var(--paper);
+    padding: 26px;
+    border: 1.5px dashed rgba(11,15,16,0.35);
+    display:inline-flex;
+    flex-direction:column;
+    align-items:center;
+    gap:16px;
+  }
+
+  .bracket{
+    position:absolute;
+    width:22px; height:22px;
+    border-color: var(--signal);
+    border-style:solid;
+    border-width:0;
+  }
+  .bracket.tl{ top:-9px; left:-9px; border-top-width:2.5px; border-left-width:2.5px; }
+  .bracket.tr{ top:-9px; right:-9px; border-top-width:2.5px; border-right-width:2.5px; }
+  .bracket.bl{ bottom:-9px; left:-9px; border-bottom-width:2.5px; border-left-width:2.5px; }
+  .bracket.br{ bottom:-9px; right:-9px; border-bottom-width:2.5px; border-right-width:2.5px; }
+
+  #qr-canvas-holder{
+    line-height:0;
+    position:relative;
+    overflow:hidden;
+  }
+  #qr-canvas-holder img, #qr-canvas-holder canvas{
+    display:block;
+    image-rendering: pixelated;
+  }
+
+  .sweep{
+    position:absolute;
+    left:0; right:0;
+    top:0;
+    height:34%;
+    background: linear-gradient(180deg, transparent, rgba(78,232,199,0.55), transparent);
+    transform: translateY(-120%);
+    pointer-events:none;
+  }
+  .sweep.run{ animation: sweep-move 0.9s ease-out; }
+  @keyframes sweep-move{
+    0%{ transform: translateY(-120%); }
+    100%{ transform: translateY(340%); }
+  }
+
+  .tag-meta{
+    width:100%;
+    display:flex;
+    justify-content:center;
+    font-family: var(--mono);
+    color: rgba(11,15,16,0.55);
+    font-size:10.5px;
+    letter-spacing:0.01em;
+  }
+  .tag-meta.hidden{ display:none; }
+  .tag-meta .content-preview{
+    max-width: 100%;
+    overflow:hidden;
+    text-overflow:ellipsis;
+    white-space:nowrap;
+    color: rgba(11,15,16,0.75);
+  }
+
+  /* empty-state loader: a target reticle with a looping scan line */
+  .qr-placeholder{
+    position:absolute;
+    inset:0;
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    justify-content:center;
+    gap:16px;
+    overflow:hidden;
+  }
+  .placeholder-scan{
+    position:absolute;
+    left:4%; right:4%;
+    height:2px;
+    top:6%;
+    background: linear-gradient(90deg, transparent, var(--signal-dim) 15%, var(--signal) 50%, var(--signal-dim) 85%, transparent);
+    opacity:0;
+    animation: scan-loop 2.6s cubic-bezier(.45,0,.55,1) infinite;
+  }
+  @keyframes scan-loop{
+    0%{ top:6%; opacity:0; }
+    8%{ opacity:1; }
+    50%{ top:92%; opacity:1; }
+    92%{ opacity:1; }
+    100%{ top:92%; opacity:0; }
+  }
+  .placeholder-icon{
+    width:56px; height:56px;
+    opacity:0.5;
+    animation: icon-pulse 2.6s ease-in-out infinite;
+  }
+  .placeholder-icon svg{ width:100%; height:100%; display:block; }
+  @keyframes icon-pulse{
+    0%, 100%{ opacity:0.32; transform:scale(0.96); }
+    50%{ opacity:0.6; transform:scale(1); }
+  }
+  .placeholder-caption{
+    font-family: var(--mono);
+    font-size:11px;
+    letter-spacing:0.02em;
+    color: rgba(11,15,16,0.45);
+  }
+
+  .status{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-top:26px;
+    font-family:var(--mono);
+    font-size:11.5px;
+    color: var(--text-dim);
+  }
+  .dot{
+    width:7px; height:7px;
+    border-radius:50%;
+    background: var(--signal);
+    box-shadow: 0 0 0 0 rgba(78,232,199,0.6);
+    animation: pulse 1.8s infinite;
+  }
+  @keyframes pulse{
+    0%{ box-shadow: 0 0 0 0 rgba(78,232,199,0.5); }
+    70%{ box-shadow: 0 0 0 8px rgba(78,232,199,0); }
+    100%{ box-shadow: 0 0 0 0 rgba(78,232,199,0); }
+  }
+  .status.empty .dot{ background: #4a5555; animation:none; box-shadow:none; }
+
+  .actions{
+    display:flex;
+    gap:10px;
+    margin-top:22px;
+    flex-wrap:wrap;
+    justify-content:center;
+  }
+  .btn{
+    font-family: var(--mono);
+    font-size:12.5px;
+    padding:12px 20px;
+    border:1.5px solid var(--signal);
+    background: transparent;
+    color: var(--signal);
+    cursor:pointer;
+    transition: transform .12s ease, background .15s, color .15s;
+  }
+  .btn.primary{ background: var(--signal); color: var(--ink); }
+  .btn.primary:hover{ transform: translateY(-2px) rotate(-0.4deg); }
+  .btn.ghost{ border-color: var(--border); color: var(--text-dim); }
+  .btn.ghost:hover{ border-color:#3a4547; color:var(--text); }
+  .btn:active{ transform: translateY(0); }
+
+  footer{
+    margin-top:40px;
+    font-family: var(--mono);
+    font-size:11px;
+    color:#4c5758;
+    text-align:center;
+  }
+  footer a{ color:#6b7a78; text-decoration:underline; text-underline-offset:2px; }
+
+  @media (prefers-reduced-motion: reduce){
+    .sweep.run{ animation:none; }
+    .dot{ animation:none; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+
+  <header class="top">
+    <div class="mark">
+      <div class="mark-glyph"></div>
+      <div class="mark-word"><b>Signal Tag</b><br>qr label studio</div>
+    </div>
+  </header>
+
+  <h1>Turn anything into a scannable tag.</h1>
+  <p class="sub">Type a link, a note, Wi-Fi details or an email address — the tag updates as you go, ready to print or drop into anything.</p>
+
+  <div class="grid" style="margin-top:36px;">
+
+    <!-- CONTROL PANEL -->
+    <div class="panel">
+
+      <div class="type-tabs" id="typeTabs">
+        <button class="active" data-type="url">URL</button>
+        <button data-type="text">TEXT</button>
+        <button data-type="wifi">WIFI</button>
+        <button data-type="email">EMAIL</button>
+        <button data-type="phone">PHONE</button>
+      </div>
+
+      <div class="field" id="field-url">
+        <label>Link</label>
+        <input type="text" id="input-url" placeholder="example.com/menu" />
+      </div>
+
+      <div class="field" id="field-text" style="display:none;">
+        <label>Content</label>
+        <textarea id="input-text" placeholder="Any text you want encoded — a note, an address, a quote."></textarea>
+      </div>
+
+      <div class="field" id="field-email" style="display:none;">
+        <label>Address</label>
+        <input type="text" id="input-email" placeholder="hello@studio.com" />
+      </div>
+
+      <div class="field" id="field-phone" style="display:none;">
+        <label>Phone number</label>
+        <input type="text" id="input-phone" placeholder="+1 555 010 2938" />
+      </div>
+
+      <div class="field" id="field-wifi" style="display:none;">
+        <label>Network name (SSID)</label>
+        <input type="text" id="input-ssid" placeholder="Studio-WiFi" style="margin-bottom:12px;" />
+        <label>Password</label>
+        <input type="text" id="input-wifipass" placeholder="leave blank if open" style="margin-bottom:12px;" />
+        <label>Security</label>
+        <select id="input-wifisec">
+          <option value="WPA">WPA / WPA2</option>
+          <option value="WEP">WEP</option>
+          <option value="nopass">None (open network)</option>
+        </select>
+      </div>
+
+      <div class="field">
+        <label>Size — <span class="val" id="sizeVal">280</span>px</label>
+        <input type="range" id="input-size" min="160" max="480" step="10" value="280">
+      </div>
+
+      <div class="field">
+        <label>Colors</label>
+        <div class="swatch-row">
+          <div class="swatch">
+            <input type="color" id="input-fg" value="#0b0f10">
+            <span>Modules</span>
+          </div>
+          <div class="swatch">
+            <input type="color" id="input-bg" value="#f6f4ec">
+            <span>Paper</span>
+          </div>
+        </div>
+        <div class="note">Keep strong contrast between the two — low-contrast tags won't scan reliably.</div>
+      </div>
+
+      <div class="field">
+        <label>Error correction</label>
+        <div class="ec-group" id="ecGroup">
+          <label><input type="radio" name="ec" value="L"><b>L</b>~7%</label>
+          <label><input type="radio" name="ec" value="M" checked><b>M</b>~15%</label>
+          <label><input type="radio" name="ec" value="Q"><b>Q</b>~25%</label>
+          <label><input type="radio" name="ec" value="H"><b>H</b>~30%</label>
+        </div>
+        <div class="note">Higher levels survive more damage or a logo overlay, at the cost of a denser pattern.</div>
+      </div>
+
+    </div>
+
+    <!-- OUTPUT / TAG -->
+    <div class="stage">
+      <div class="tag" id="tag">
+        <div class="bracket tl"></div>
+        <div class="bracket tr"></div>
+        <div class="bracket bl"></div>
+        <div class="bracket br"></div>
+
+        <div id="qr-canvas-holder">
+          <div class="sweep" id="sweep"></div>
+        </div>
+
+        <div class="tag-meta" id="tagMeta">
+          <span class="content-preview" id="metaPreview">example.com/menu</span>
+        </div>
+      </div>
+
+      <div class="status" id="statusRow">
+        <div class="dot"></div>
+        <span id="statusText">ready to scan</span>
+      </div>
+
+      <div class="actions">
+        <button class="btn primary" id="btnDownload">Download PNG</button>
+        <button class="btn ghost" id="btnReset">Reset colors</button>
+      </div>
+    </div>
+
+  </div>
+
+  <footer>&copy; <span id="year"></span> Jubayer Hossen</footer>
+</div>
+
+<script>
+  document.getElementById("year").textContent = new Date().getFullYear();
+</script>
+
+<script>
+(function(){
+  var state = {
+    type: 'url',
+    size: 280,
+    fg: '#0b0f10',
+    bg: '#f6f4ec',
+    ec: 'M'
+  };
+
+  var holder = document.getElementById('qr-canvas-holder');
+  var sweep = document.getElementById('sweep');
+  var metaPreview = document.getElementById('metaPreview');
+  var statusRow = document.getElementById('statusRow');
+  var statusText = document.getElementById('statusText');
+
+  var ecMap = { L: QRCode.CorrectLevel.L, M: QRCode.CorrectLevel.M, Q: QRCode.CorrectLevel.Q, H: QRCode.CorrectLevel.H };
+
+  function buildPayload(){
+    if (state.type === 'url'){
+      var v = document.getElementById('input-url').value.trim();
+      if (!v) return '';
+      if (!/^https?:\/\//i.test(v)) v = 'https://' + v;
+      return v;
+    }
+    if (state.type === 'text'){
+      return document.getElementById('input-text').value;
+    }
+    if (state.type === 'email'){
+      var e = document.getElementById('input-email').value.trim();
+      return e ? ('mailto:' + e) : '';
+    }
+    if (state.type === 'phone'){
+      var p = document.getElementById('input-phone').value.trim();
+      if (!p) return '';
+      var cleaned = p.replace(/[^\d+]/g, '');
+      return 'tel:' + cleaned;
+    }
+    if (state.type === 'wifi'){
+      var ssid = document.getElementById('input-ssid').value.trim();
+      var pass = document.getElementById('input-wifipass').value;
+      var sec = document.getElementById('input-wifisec').value;
+      if (!ssid) return '';
+      if (sec === 'nopass') return 'WIFI:T:nopass;S:' + escapeWifi(ssid) + ';;';
+      return 'WIFI:T:' + sec + ';S:' + escapeWifi(ssid) + ';P:' + escapeWifi(pass) + ';;';
+    }
+    return '';
+  }
+  function escapeWifi(s){ return String(s).replace(/([\\;,:"])/g, '\\$1'); }
+
+  function previewLabel(payload){
+    if (!payload) return 'waiting for content…';
+    if (state.type === 'wifi'){
+      var ssid = document.getElementById('input-ssid').value.trim();
+      return 'wifi · ' + ssid;
+    }
+    if (state.type === 'phone'){
+      return 'call · ' + document.getElementById('input-phone').value.trim();
+    }
+    return payload.length > 34 ? payload.slice(0,34) + '…' : payload;
+  }
+
+  var qrInstance = null;
+
+  function buildPlaceholder(size){
+    holder.style.position = 'relative';
+    holder.style.width = size + 'px';
+    holder.style.height = size + 'px';
+    holder.style.background = state.bg;
+
+    var wrap = document.createElement('div');
+    wrap.className = 'qr-placeholder';
+
+    var scan = document.createElement('div');
+    scan.className = 'placeholder-scan';
+    wrap.appendChild(scan);
+
+    var icon = document.createElement('div');
+    icon.className = 'placeholder-icon';
+    icon.innerHTML =
+      '<svg viewBox="0 0 56 56" fill="none" xmlns="http://www.w3.org/2000/svg">' +
+        '<rect x="4" y="4" width="16" height="16" stroke="#0B0F10" stroke-width="2.5"/>' +
+        '<rect x="36" y="4" width="16" height="16" stroke="#0B0F10" stroke-width="2.5"/>' +
+        '<rect x="4" y="36" width="16" height="16" stroke="#0B0F10" stroke-width="2.5"/>' +
+        '<rect x="10" y="10" width="4" height="4" fill="#0B0F10"/>' +
+        '<rect x="42" y="10" width="4" height="4" fill="#0B0F10"/>' +
+        '<rect x="10" y="42" width="4" height="4" fill="#0B0F10"/>' +
+      '</svg>';
+    wrap.appendChild(icon);
+
+    var caption = document.createElement('div');
+    caption.className = 'placeholder-caption';
+    caption.textContent = 'add content to generate a tag';
+    wrap.appendChild(caption);
+
+    holder.appendChild(wrap);
+  }
+
+  function render(){
+    var payload = buildPayload();
+
+    holder.innerHTML = '';
+    holder.appendChild(sweep);
+
+    if (!payload){
+      statusRow.classList.add('empty');
+      statusText.textContent = 'waiting for content';
+      document.getElementById('tagMeta').classList.add('hidden');
+      buildPlaceholder(state.size);
+      return;
+    }
+
+    statusRow.classList.remove('empty');
+    statusText.textContent = 'ready to scan';
+    document.getElementById('tagMeta').classList.remove('hidden');
+    metaPreview.textContent = previewLabel(payload);
+
+    new QRCode(holder, {
+      text: payload,
+      width: state.size,
+      height: state.size,
+      colorDark: state.fg,
+      colorLight: state.bg,
+      correctLevel: ecMap[state.ec]
+    });
+
+    holder.appendChild(sweep);
+    sweep.classList.remove('run');
+    void sweep.offsetWidth;
+    sweep.classList.add('run');
+  }
+
+  var debounceTimer;
+  function scheduleRender(){
+    clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(render, 120);
+  }
+
+  // type tabs
+  var tabs = document.querySelectorAll('#typeTabs button');
+  var fields = { url:'field-url', text:'field-text', wifi:'field-wifi', email:'field-email', phone:'field-phone' };
+  tabs.forEach(function(btn){
+    btn.addEventListener('click', function(){
+      tabs.forEach(function(b){ b.classList.remove('active'); });
+      btn.classList.add('active');
+      state.type = btn.getAttribute('data-type');
+      Object.keys(fields).forEach(function(k){
+        document.getElementById(fields[k]).style.display = (k === state.type) ? '' : 'none';
+      });
+      render();
+    });
+  });
+
+  ['input-url','input-text','input-email','input-phone','input-ssid','input-wifipass'].forEach(function(id){
+    document.getElementById(id).addEventListener('input', scheduleRender);
+  });
+  document.getElementById('input-wifisec').addEventListener('change', scheduleRender);
+
+  document.getElementById('input-size').addEventListener('input', function(e){
+    state.size = parseInt(e.target.value, 10);
+    document.getElementById('sizeVal').textContent = state.size;
+    scheduleRender();
+  });
+
+  document.getElementById('input-fg').addEventListener('input', function(e){ state.fg = e.target.value; scheduleRender(); });
+  document.getElementById('input-bg').addEventListener('input', function(e){ state.bg = e.target.value; scheduleRender(); });
+
+  document.getElementById('ecGroup').addEventListener('change', function(e){
+    if (e.target.name === 'ec'){ state.ec = e.target.value; scheduleRender(); }
+  });
+
+  document.getElementById('btnReset').addEventListener('click', function(){
+    state.fg = '#0b0f10'; state.bg = '#f6f4ec';
+    document.getElementById('input-fg').value = state.fg;
+    document.getElementById('input-bg').value = state.bg;
+    render();
+  });
+
+  document.getElementById('btnDownload').addEventListener('click', function(){
+    var canvas = holder.querySelector('canvas');
+    var img = holder.querySelector('img');
+    var dataUrl;
+    if (canvas) dataUrl = canvas.toDataURL('image/png');
+    else if (img) dataUrl = img.src;
+    if (!dataUrl) return;
+    var a = document.createElement('a');
+    a.href = dataUrl;
+    a.download = 'signal-tag.png';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+  });
+
+  // seed with a starter value
+  document.getElementById('input-url').value = 'example.com/menu';
+  render();
+})();
+</script>
+</body>
+</html>
